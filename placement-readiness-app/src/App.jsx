@@ -9,6 +9,8 @@ import Profile from './pages/Profile';
 import JDInput from './pages/JDInput';
 import Results from './pages/Results';
 import History from './pages/History';
+import TestChecklist from './pages/TestChecklist';
+import Ship from './pages/Ship';
 
 function App() {
   return (
@@ -24,6 +26,8 @@ function App() {
           <Route path="analyze" element={<JDInput />} />
           <Route path="results" element={<Results />} />
           <Route path="history" element={<History />} />
+          <Route path="prp/07-test" element={<TestChecklist />} />
+          <Route path="prp/08-ship" element={<Ship />} />
         </Route>
       </Routes>
     </BrowserRouter>

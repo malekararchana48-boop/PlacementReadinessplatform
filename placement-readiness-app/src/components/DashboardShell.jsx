@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, Code2, ClipboardList, BookOpen, User, Menu, Sparkles, History } from 'lucide-react';
+import { LayoutDashboard, Code2, ClipboardList, BookOpen, User, Menu, Sparkles, History, ClipboardCheck, Rocket } from 'lucide-react';
 import { useState } from 'react';
 
 const navItems = [
@@ -10,6 +10,11 @@ const navItems = [
   { path: '/dashboard/assessments', label: 'Assessments', icon: ClipboardList },
   { path: '/dashboard/resources', label: 'Resources', icon: BookOpen },
   { path: '/dashboard/profile', label: 'Profile', icon: User },
+];
+
+const devNavItems = [
+  { path: '/dashboard/prp/07-test', label: 'Test Checklist', icon: ClipboardCheck },
+  { path: '/dashboard/prp/08-ship', label: 'Ship', icon: Rocket },
 ];
 
 export default function DashboardShell() {
@@ -57,6 +62,33 @@ export default function DashboardShell() {
               </li>
             ))}
           </ul>
+          
+          {/* Dev/Test Navigation */}
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+              Development
+            </p>
+            <ul className="space-y-1">
+              {devNavItems.map((item) => (
+                <li key={item.path}>
+                  <NavLink
+                    to={item.path}
+                    onClick={() => setSidebarOpen(false)}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                        isActive
+                          ? 'bg-primary-50 text-primary'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      }`
+                    }
+                  >
+                    <item.icon className="w-5 h-5" />
+                    {item.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </div>
         </nav>
       </aside>
 
