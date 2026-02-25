@@ -6,6 +6,9 @@ import Practice from './pages/Practice';
 import Assessments from './pages/Assessments';
 import Resources from './pages/Resources';
 import Profile from './pages/Profile';
+import JDInput from './pages/JDInput';
+import Results from './pages/Results';
+import History from './pages/History';
 
 function App() {
   return (
@@ -18,6 +21,9 @@ function App() {
           <Route path="assessments" element={<Assessments />} />
           <Route path="resources" element={<Resources />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="analyze" element={<JDInput />} />
+          <Route path="results" element={<Results />} />
+          <Route path="history" element={<History />} />
         </Route>
       </Routes>
     </BrowserRouter>
