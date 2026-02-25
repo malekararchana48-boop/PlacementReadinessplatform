@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, Building2, FileText, Sparkles, Loader2 } from 'lucide-react';
+import { Briefcase, Building2, FileText, Sparkles, Loader2, AlertTriangle } from 'lucide-react';
 import { extractSkills } from '../utils/skillExtractor';
 import { generateChecklist, generatePlan, generateQuestions } from '../utils/analysisEngine';
 import { calculateReadinessScore } from '../utils/readinessScore';
@@ -15,11 +15,15 @@ export default function JDInput() {
   });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState('');
+  const [showShortWarning, setShowShortWarning] = useState(false);
+
+  const MIN_JD_LENGTH = 200;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
+    // Validation: JD is required
     if (!formData.jdText.trim()) {
       setError('Please enter a job description');
       return;
@@ -72,6 +76,11 @@ export default function JDInput() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Show warning if JD is too short
+    if (name === 'jdText') {
+      setShowShortWarning(value.length > 0 && value.length < MIN_JD_LENGTH);
+    }
   };
 
   return (
@@ -141,8 +150,18 @@ export default function JDInput() {
           />
           <div className="flex justify-between mt-2 text-sm text-gray-500">
             <span>{formData.jdText.length} characters</span>
-            <span>Minimum 100 characters recommended</span>
+            <span>Minimum {MIN_JD_LENGTH} characters recommended</span>
           </div>
+          
+          {/* Short JD Warning */}
+          {showShortWarning && (
+            <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-700">
+                This JD is too short to analyze deeply. Paste full JD for better output.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Error Message */}

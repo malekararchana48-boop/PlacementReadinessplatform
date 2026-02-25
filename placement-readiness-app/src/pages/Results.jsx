@@ -50,7 +50,11 @@ export default function Results() {
     
     // Initialize skill confidence from stored data or default all to "practice"
     const initialConfidence = entry.skillConfidenceMap || {};
-    const allSkills = Object.values(entry.extractedSkills).flatMap(cat => cat.skills);
+    
+    // Handle both old format (with skills array) and new format (direct arrays)
+    const allSkills = Object.values(entry.extractedSkills).flatMap(cat => 
+      Array.isArray(cat) ? cat : (cat.skills || [])
+    );
     
     allSkills.forEach(skill => {
       if (!initialConfidence[skill]) {
@@ -59,7 +63,8 @@ export default function Results() {
     });
     
     setSkillConfidence(initialConfidence);
-    setLiveScore(entry.readinessScore);
+    // Use finalScore if available, otherwise fall back to readinessScore or baseScore
+    setLiveScore(entry.finalScore || entry.readinessScore || entry.baseScore || 35);
     setLoading(false);
   }, [id, navigate]);
 
@@ -85,14 +90,14 @@ export default function Results() {
     
     setSkillConfidence(newConfidence);
     
-    // Calculate and update live score
-    const newScore = calculateLiveScore(newConfidence, analysis.readinessScore);
+    // Calculate and update live score based on baseScore (never changes)
+    const baseScore = analysis.baseScore || analysis.readinessScore || 35;
+    const newScore = calculateLiveScore(newConfidence, baseScore);
     setLiveScore(newScore);
     
-    // Persist to localStorage
+    // Persist to localStorage - finalScore will be recalculated
     updateHistoryEntry(id, {
-      skillConfidenceMap: newConfidence,
-      adjustedScore: newScore
+      skillConfidenceMap: newConfidence
     });
   };
 

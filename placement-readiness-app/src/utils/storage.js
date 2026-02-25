@@ -1,3 +1,5 @@
+import { createStandardizedEntry, validateEntry, repairEntry } from './schema';
+
 const STORAGE_KEY = 'placement_readiness_history';
 
 /**
@@ -9,16 +11,55 @@ function generateId() {
 }
 
 /**
- * Get all history entries from localStorage
- * @returns {Array} - Array of history entries
+ * Get all history entries from localStorage with validation and repair
+ * @returns {Object} - { entries: Array, corruptedCount: number, error: string|null }
  */
 export function getHistory() {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    if (!data) {
+      return { entries: [], corruptedCount: 0, error: null };
+    }
+
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed)) {
+      return { entries: [], corruptedCount: 0, error: null };
+    }
+
+    const validEntries = [];
+    let corruptedCount = 0;
+
+    parsed.forEach(entry => {
+      // Try to validate
+      const validation = validateEntry(entry);
+      
+      if (validation.isValid) {
+        validEntries.push(entry);
+      } else {
+        // Try to repair
+        const repaired = repairEntry(entry);
+        if (repaired) {
+          validEntries.push(repaired);
+          corruptedCount++;
+        } else {
+          corruptedCount++;
+        }
+      }
+    });
+
+    // If any were corrupted, save the cleaned version
+    if (corruptedCount > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(validEntries));
+    }
+
+    const error = corruptedCount > 0 
+      ? `One saved entry couldn't be loaded. Create a new analysis.` 
+      : null;
+
+    return { entries: validEntries, corruptedCount, error };
   } catch (error) {
     console.error('Error reading from localStorage:', error);
-    return [];
+    return { entries: [], corruptedCount: 0, error: 'Failed to load history. Please try again.' };
   }
 }
 
@@ -29,21 +70,23 @@ export function getHistory() {
  */
 export function saveAnalysis(entry) {
   try {
-    const history = getHistory();
-    const newEntry = {
+    const { entries: history } = getHistory();
+    
+    // Create standardized entry
+    const standardizedEntry = createStandardizedEntry({
       id: generateId(),
       createdAt: new Date().toISOString(),
       ...entry
-    };
+    });
     
     // Add to beginning of array (newest first)
-    history.unshift(newEntry);
+    history.unshift(standardizedEntry);
     
     // Keep only last 50 entries to prevent storage issues
     const trimmedHistory = history.slice(0, 50);
     
     localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmedHistory));
-    return newEntry;
+    return standardizedEntry;
   } catch (error) {
     console.error('Error saving to localStorage:', error);
     throw new Error('Failed to save analysis. Storage may be full.');
@@ -56,8 +99,8 @@ export function saveAnalysis(entry) {
  * @returns {Object|null} - History entry or null if not found
  */
 export function getHistoryEntry(id) {
-  const history = getHistory();
-  return history.find(entry => entry.id === id) || null;
+  const { entries } = getHistory();
+  return entries.find(entry => entry.id === id) || null;
 }
 
 /**
@@ -67,8 +110,8 @@ export function getHistoryEntry(id) {
  */
 export function deleteHistoryEntry(id) {
   try {
-    const history = getHistory();
-    const filtered = history.filter(entry => entry.id !== id);
+    const { entries } = getHistory();
+    const filtered = entries.filter(entry => entry.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     return true;
   } catch (error) {
@@ -85,22 +128,37 @@ export function deleteHistoryEntry(id) {
  */
 export function updateHistoryEntry(id, updates) {
   try {
-    const history = getHistory();
-    const entryIndex = history.findIndex(entry => entry.id === id);
+    const { entries } = getHistory();
+    const entryIndex = entries.findIndex(entry => entry.id === id);
     
     if (entryIndex === -1) {
       return null;
     }
     
+    // Get current entry
+    const currentEntry = entries[entryIndex];
+    
+    // If skillConfidenceMap is being updated, recalculate finalScore
+    let finalScore = currentEntry.finalScore;
+    if (updates.skillConfidenceMap) {
+      const baseScore = currentEntry.baseScore;
+      let adjustment = 0;
+      Object.values(updates.skillConfidenceMap).forEach(confidence => {
+        adjustment += confidence === 'know' ? 2 : -2;
+      });
+      finalScore = Math.max(0, Math.min(100, baseScore + adjustment));
+    }
+    
     // Update the entry
-    history[entryIndex] = {
-      ...history[entryIndex],
+    entries[entryIndex] = {
+      ...currentEntry,
       ...updates,
+      finalScore,
       updatedAt: new Date().toISOString()
     };
     
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-    return history[entryIndex];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    return entries[entryIndex];
   } catch (error) {
     console.error('Error updating localStorage:', error);
     return null;

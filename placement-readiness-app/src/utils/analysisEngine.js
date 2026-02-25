@@ -1,4 +1,5 @@
 import { getAllSkillsFlat, getDetectedCategoryCount } from './skillExtractor';
+import { DEFAULT_SKILLS_WHEN_EMPTY } from './schema';
 
 /**
  * Generate round-wise preparation checklist based on detected skills
@@ -7,8 +8,11 @@ import { getAllSkillsFlat, getDetectedCategoryCount } from './skillExtractor';
  */
 export function generateChecklist(extractedSkills) {
   const skills = getAllSkillsFlat(extractedSkills);
-  const hasSkill = (keyword) => skills.some(s => s.toLowerCase().includes(keyword.toLowerCase()));
-  const hasCategory = (cat) => extractedSkills[cat] && extractedSkills[cat].skills.length > 0;
+  
+  // If no skills detected, use default skills
+  const effectiveSkills = skills.length > 0 ? skills : DEFAULT_SKILLS_WHEN_EMPTY;
+  const hasSkill = (keyword) => effectiveSkills.some(s => s.toLowerCase().includes(keyword.toLowerCase()));
+  const hasCategory = (cat) => extractedSkills[cat] && (extractedSkills[cat].length > 0 || extractedSkills[cat].skills?.length > 0);
 
   const rounds = [
     {
@@ -86,8 +90,11 @@ export function generateChecklist(extractedSkills) {
  */
 export function generatePlan(extractedSkills) {
   const skills = getAllSkillsFlat(extractedSkills);
-  const hasSkill = (keyword) => skills.some(s => s.toLowerCase().includes(keyword.toLowerCase()));
-  const hasCategory = (cat) => extractedSkills[cat] && extractedSkills[cat].skills.length > 0;
+  
+  // If no skills detected, use default skills
+  const effectiveSkills = skills.length > 0 ? skills : DEFAULT_SKILLS_WHEN_EMPTY;
+  const hasSkill = (keyword) => effectiveSkills.some(s => s.toLowerCase().includes(keyword.toLowerCase()));
+  const hasCategory = (cat) => extractedSkills[cat] && (extractedSkills[cat].length > 0 || extractedSkills[cat].skills?.length > 0);
 
   const plan = [
     {
@@ -181,8 +188,11 @@ export function generatePlan(extractedSkills) {
  */
 export function generateQuestions(extractedSkills) {
   const skills = getAllSkillsFlat(extractedSkills);
-  const hasSkill = (keyword) => skills.some(s => s.toLowerCase().includes(keyword.toLowerCase()));
-  const hasCategory = (cat) => extractedSkills[cat] && extractedSkills[cat].skills.length > 0;
+  
+  // If no skills detected, use default skills
+  const effectiveSkills = skills.length > 0 ? skills : DEFAULT_SKILLS_WHEN_EMPTY;
+  const hasSkill = (keyword) => effectiveSkills.some(s => s.toLowerCase().includes(keyword.toLowerCase()));
+  const hasCategory = (cat) => extractedSkills[cat] && (extractedSkills[cat].length > 0 || extractedSkills[cat].skills?.length > 0);
 
   const questions = [];
 

@@ -1,34 +1,28 @@
-// Skill categories with keywords for extraction
+// Skill categories with keywords for extraction (matches schema structure)
 const skillCategories = {
   coreCS: {
     label: 'Core CS',
-    keywords: ['DSA', 'OOP', 'DBMS', 'OS', 'Networks', 'Data Structures', 'Algorithms', 'Object Oriented', 'Database', 'Operating System', 'Computer Networks'],
-    skills: []
+    keywords: ['DSA', 'OOP', 'DBMS', 'OS', 'Networks', 'Data Structures', 'Algorithms', 'Object Oriented', 'Database', 'Operating System', 'Computer Networks']
   },
   languages: {
     label: 'Languages',
-    keywords: ['Java', 'Python', 'JavaScript', 'TypeScript', 'C', 'C++', 'C#', 'Go', 'Golang', 'Ruby', 'PHP', 'Swift', 'Kotlin', 'Rust', 'Scala'],
-    skills: []
+    keywords: ['Java', 'Python', 'JavaScript', 'TypeScript', 'C', 'C++', 'C#', 'Go', 'Golang', 'Ruby', 'PHP', 'Swift', 'Kotlin', 'Rust', 'Scala']
   },
   web: {
     label: 'Web Development',
-    keywords: ['React', 'Next.js', 'Node.js', 'Express', 'REST', 'GraphQL', 'Angular', 'Vue', 'Svelte', 'HTML', 'CSS', 'Bootstrap', 'Tailwind', 'Webpack', 'Vite'],
-    skills: []
+    keywords: ['React', 'Next.js', 'Node.js', 'Express', 'REST', 'GraphQL', 'Angular', 'Vue', 'Svelte', 'HTML', 'CSS', 'Bootstrap', 'Tailwind', 'Webpack', 'Vite']
   },
   data: {
     label: 'Data & Databases',
-    keywords: ['SQL', 'MongoDB', 'PostgreSQL', 'MySQL', 'Redis', 'Elasticsearch', 'Cassandra', 'DynamoDB', 'Firebase', 'Prisma', 'Sequelize'],
-    skills: []
+    keywords: ['SQL', 'MongoDB', 'PostgreSQL', 'MySQL', 'Redis', 'Elasticsearch', 'Cassandra', 'DynamoDB', 'Firebase', 'Prisma', 'Sequelize']
   },
-  cloudDevOps: {
+  cloud: {
     label: 'Cloud & DevOps',
-    keywords: ['AWS', 'Azure', 'GCP', 'Google Cloud', 'Docker', 'Kubernetes', 'CI/CD', 'Jenkins', 'GitHub Actions', 'Terraform', 'Ansible', 'Linux', 'Ubuntu', 'CentOS', 'Nginx'],
-    skills: []
+    keywords: ['AWS', 'Azure', 'GCP', 'Google Cloud', 'Docker', 'Kubernetes', 'CI/CD', 'Jenkins', 'GitHub Actions', 'Terraform', 'Ansible', 'Linux', 'Ubuntu', 'CentOS', 'Nginx']
   },
   testing: {
     label: 'Testing',
-    keywords: ['Selenium', 'Cypress', 'Playwright', 'JUnit', 'PyTest', 'Jest', 'Mocha', 'Chai', 'Testing Library', 'Postman', 'JMeter'],
-    skills: []
+    keywords: ['Selenium', 'Cypress', 'Playwright', 'JUnit', 'PyTest', 'Jest', 'Mocha', 'Chai', 'Testing Library', 'Postman', 'JMeter']
   }
 };
 
@@ -44,20 +38,12 @@ const allKeywords = Object.entries(skillCategories).flatMap(([category, data]) =
  */
 export function extractSkills(jdText) {
   if (!jdText || jdText.trim().length === 0) {
-    return getGeneralFresherStack();
+    return getEmptySkillStructure();
   }
 
   const text = jdText.toLowerCase();
-  const detectedSkills = {};
+  const detectedSkills = getEmptySkillStructure();
   const detectedCategories = new Set();
-
-  // Initialize categories
-  Object.keys(skillCategories).forEach(key => {
-    detectedSkills[key] = {
-      label: skillCategories[key].label,
-      skills: []
-    };
-  });
 
   // Detect skills
   allKeywords.forEach(({ keyword, category, original }) => {
@@ -68,30 +54,28 @@ export function extractSkills(jdText) {
       : new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
 
     if (pattern.test(text)) {
-      if (!detectedSkills[category].skills.includes(original)) {
-        detectedSkills[category].skills.push(original);
+      if (!detectedSkills[category].includes(original)) {
+        detectedSkills[category].push(original);
         detectedCategories.add(category);
       }
     }
   });
 
-  // If no skills detected, return general fresher stack
-  if (detectedCategories.size === 0) {
-    return getGeneralFresherStack();
-  }
-
   return detectedSkills;
 }
 
 /**
- * Get general fresher stack when no skills detected
+ * Get empty skill structure matching schema
  */
-function getGeneralFresherStack() {
+function getEmptySkillStructure() {
   return {
-    general: {
-      label: 'General Fresher Stack',
-      skills: ['DSA', 'OOP', 'DBMS', 'Any Programming Language', 'Basic Web Development']
-    }
+    coreCS: [],
+    languages: [],
+    web: [],
+    data: [],
+    cloud: [],
+    testing: [],
+    other: []
   };
 }
 
@@ -101,8 +85,7 @@ function getGeneralFresherStack() {
  * @returns {number} - Number of categories with skills
  */
 export function getDetectedCategoryCount(extractedSkills) {
-  if (extractedSkills.general) return 1;
-  return Object.values(extractedSkills).filter(cat => cat.skills.length > 0).length;
+  return Object.values(extractedSkills).filter(cat => Array.isArray(cat) && cat.length > 0).length;
 }
 
 /**
@@ -111,8 +94,5 @@ export function getDetectedCategoryCount(extractedSkills) {
  * @returns {Array} - Flat array of all skills
  */
 export function getAllSkillsFlat(extractedSkills) {
-  if (extractedSkills.general) {
-    return extractedSkills.general.skills;
-  }
-  return Object.values(extractedSkills).flatMap(cat => cat.skills);
+  return Object.values(extractedSkills).flatMap(cat => Array.isArray(cat) ? cat : []);
 }

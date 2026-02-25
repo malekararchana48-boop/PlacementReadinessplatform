@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Building2, Briefcase, Trash2, ExternalLink, Award, Search, X } from 'lucide-react';
+import { Calendar, Building2, Briefcase, Trash2, ExternalLink, Award, Search, X, AlertTriangle } from 'lucide-react';
 import { getHistory, deleteHistoryEntry, formatDate } from '../utils/storage';
 import { getScoreCategory } from '../utils/readinessScore';
 
@@ -8,14 +8,16 @@ export default function History() {
   const navigate = useNavigate();
   const [history, setHistory] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [corruptionError, setCorruptionError] = useState(null);
 
   useEffect(() => {
     loadHistory();
   }, []);
 
   const loadHistory = () => {
-    const entries = getHistory();
+    const { entries, error } = getHistory();
     setHistory(entries);
+    setCorruptionError(error);
   };
 
   const handleDelete = (id, e) => {
@@ -45,6 +47,14 @@ export default function History() {
         <h2 className="text-2xl font-bold text-gray-900">Analysis History</h2>
         <p className="text-gray-600 mt-1">View your past job description analyses</p>
       </div>
+
+      {/* Corruption Error */}
+      {corruptionError && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-700">{corruptionError}</p>
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative">
