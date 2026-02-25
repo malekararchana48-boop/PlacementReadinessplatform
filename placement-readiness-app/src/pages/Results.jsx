@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Building2, Briefcase, Calendar, CheckCircle, Target, HelpCircle, BookOpen, Award, Clock } from 'lucide-react';
-import { getHistoryEntry, formatDate } from '../utils/storage';
+import { ArrowLeft, Building2, Briefcase, Calendar, CheckCircle, Target, HelpCircle, Award, Clock, Download, Copy, Check, Zap, AlertCircle } from 'lucide-react';
+import { getHistoryEntry, formatDate, updateHistoryEntry } from '../utils/storage';
 import { getScoreCategory } from '../utils/readinessScore';
 import CircularProgress from '../components/CircularProgress';
 
@@ -10,9 +10,13 @@ export default function Results() {
   const navigate = useNavigate();
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [skillConfidence, setSkillConfidence] = useState({});
+  const [liveScore, setLiveScore] = useState(0);
+  const [copiedSection, setCopiedSection] = useState(null);
 
   const id = searchParams.get('id');
 
+  // Initialize skill confidence from stored data or default to "practice"
   useEffect(() => {
     if (!id) {
       navigate('/analyze');
@@ -26,8 +30,140 @@ export default function Results() {
     }
 
     setAnalysis(entry);
+    
+    // Initialize skill confidence from stored data or default all to "practice"
+    const initialConfidence = entry.skillConfidenceMap || {};
+    const allSkills = Object.values(entry.extractedSkills).flatMap(cat => cat.skills);
+    
+    allSkills.forEach(skill => {
+      if (!initialConfidence[skill]) {
+        initialConfidence[skill] = 'practice';
+      }
+    });
+    
+    setSkillConfidence(initialConfidence);
+    setLiveScore(entry.readinessScore);
     setLoading(false);
   }, [id, navigate]);
+
+  // Calculate live score based on skill confidence
+  const calculateLiveScore = useCallback((confidenceMap, baseScore) => {
+    let adjustment = 0;
+    Object.values(confidenceMap).forEach(confidence => {
+      if (confidence === 'know') {
+        adjustment += 2;
+      } else {
+        adjustment -= 2;
+      }
+    });
+    
+    // Bounds: 0-100
+    return Math.max(0, Math.min(100, baseScore + adjustment));
+  }, []);
+
+  // Handle skill confidence toggle
+  const toggleSkillConfidence = (skill) => {
+    const newConfidence = { ...skillConfidence };
+    newConfidence[skill] = newConfidence[skill] === 'know' ? 'practice' : 'know';
+    
+    setSkillConfidence(newConfidence);
+    
+    // Calculate and update live score
+    const newScore = calculateLiveScore(newConfidence, analysis.readinessScore);
+    setLiveScore(newScore);
+    
+    // Persist to localStorage
+    updateHistoryEntry(id, {
+      skillConfidenceMap: newConfidence,
+      adjustedScore: newScore
+    });
+  };
+
+  // Copy text to clipboard
+  const copyToClipboard = async (text, section) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedSection(section);
+      setTimeout(() => setCopiedSection(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  // Generate export text for 7-day plan
+  const generatePlanText = () => {
+    return analysis.plan.map(day => 
+      `Day ${day.day}: ${day.title}\n${day.tasks.map(t => `- ${t}`).join('\n')}`
+    ).join('\n\n');
+  };
+
+  // Generate export text for checklist
+  const generateChecklistText = () => {
+    return analysis.checklist.map(round =>
+      `Round ${round.round}: ${round.title}\n${round.items.map(i => `- ${i}`).join('\n')}`
+    ).join('\n\n');
+  };
+
+  // Generate export text for questions
+  const generateQuestionsText = () => {
+    return analysis.questions.map((q, i) => `${i + 1}. ${q}`).join('\n');
+  };
+
+  // Download full analysis as TXT
+  const downloadAsTxt = () => {
+    const allSkills = Object.values(analysis.extractedSkills).flatMap(cat => cat.skills);
+    const weakSkills = allSkills.filter(skill => skillConfidence[skill] === 'practice');
+    
+    const content = `PLACEMENT READINESS ANALYSIS
+=============================
+
+Company: ${analysis.company || 'N/A'}
+Role: ${analysis.role || 'N/A'}
+Date: ${formatDate(analysis.createdAt)}
+Base Readiness Score: ${analysis.readinessScore}/100
+Adjusted Score: ${liveScore}/100
+
+SKILLS EXTRACTED
+================
+${Object.entries(analysis.extractedSkills).map(([key, cat]) => 
+  `${cat.label}:\n${cat.skills.map(s => `  - ${s} (${skillConfidence[s] === 'know' ? 'I know this' : 'Need practice'})`).join('\n')}`
+).join('\n\n')}
+
+7-DAY PREPARATION PLAN
+======================
+${generatePlanText()}
+
+ROUND-WISE CHECKLIST
+====================
+${generateChecklistText()}
+
+LIKELY INTERVIEW QUESTIONS
+==========================
+${generateQuestionsText()}
+
+FOCUS AREAS (Need Practice)
+===========================
+${weakSkills.slice(0, 3).map(s => `- ${s}`).join('\n')}
+
+Generated by Placement Readiness Platform
+`;
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `placement-analysis-${analysis.company || 'unknown'}-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Get weak skills for Action Next box
+  const getWeakSkills = () => {
+    const allSkills = Object.values(analysis.extractedSkills).flatMap(cat => cat.skills);
+    return allSkills.filter(skill => skillConfidence[skill] === 'practice');
+  };
 
   if (loading) {
     return (
@@ -41,7 +177,8 @@ export default function Results() {
     return null;
   }
 
-  const scoreCategory = getScoreCategory(analysis.readinessScore);
+  const scoreCategory = getScoreCategory(liveScore);
+  const weakSkills = getWeakSkills();
 
   return (
     <div className="space-y-8">
@@ -91,37 +228,99 @@ export default function Results() {
 
       {/* Readiness Score */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
-          <Award className="w-5 h-5 text-primary" />
-          Readiness Score
-        </h3>
-        <div className="flex justify-center">
-          <CircularProgress score={analysis.readinessScore} />
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Award className="w-5 h-5 text-primary" />
+            Readiness Score
+          </h3>
+          <span className="text-sm text-gray-500">
+            Base: {analysis.readinessScore} | Adjusted: {liveScore}
+          </span>
         </div>
+        <div className="flex justify-center">
+          <CircularProgress score={liveScore} />
+        </div>
+        <p className="text-center text-sm text-gray-500 mt-4">
+          Toggle skills below to update your score (+2 for "I know this", -2 for "Need practice")
+        </p>
       </div>
 
-      {/* Extracted Skills */}
+      {/* Extracted Skills with Toggles */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
           <Target className="w-5 h-5 text-primary" />
           Key Skills Extracted
+          <span className="text-sm font-normal text-gray-500 ml-2">(Click to toggle confidence)</span>
         </h3>
         <div className="space-y-4">
           {Object.entries(analysis.extractedSkills).map(([key, category]) => (
             <div key={key}>
               <h4 className="text-sm font-medium text-gray-600 mb-2">{category.label}</h4>
               <div className="flex flex-wrap gap-2">
-                {category.skills.map((skill, idx) => (
-                  <span
-                    key={idx}
-                    className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium"
-                  >
-                    {skill}
-                  </span>
-                ))}
+                {category.skills.map((skill, idx) => {
+                  const confidence = skillConfidence[skill] || 'practice';
+                  const isKnown = confidence === 'know';
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => toggleSkillConfidence(skill)}
+                      className={`px-3 py-2 rounded-full text-sm font-medium transition-all ${
+                        isKnown
+                          ? 'bg-green-100 text-green-700 border-2 border-green-300'
+                          : 'bg-amber-100 text-amber-700 border-2 border-amber-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        {isKnown ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                        {skill}
+                        <span className="text-xs opacity-75">
+                          {isKnown ? 'I know this' : 'Need practice'}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Export Tools */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <Download className="w-5 h-5 text-primary" />
+          Export Tools
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <button
+            onClick={() => copyToClipboard(generatePlanText(), 'plan')}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
+          >
+            {copiedSection === 'plan' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+            <span className="text-sm">Copy 7-Day Plan</span>
+          </button>
+          <button
+            onClick={() => copyToClipboard(generateChecklistText(), 'checklist')}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
+          >
+            {copiedSection === 'checklist' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+            <span className="text-sm">Copy Checklist</span>
+          </button>
+          <button
+            onClick={() => copyToClipboard(generateQuestionsText(), 'questions')}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
+          >
+            {copiedSection === 'questions' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+            <span className="text-sm">Copy 10 Questions</span>
+          </button>
+          <button
+            onClick={downloadAsTxt}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-primary hover:bg-primary-600 text-white rounded-lg transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            <span className="text-sm">Download as TXT</span>
+          </button>
         </div>
       </div>
 
@@ -191,6 +390,46 @@ export default function Results() {
               <p className="text-gray-700">{question}</p>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Action Next Box */}
+      <div className="bg-gradient-to-r from-primary-50 to-blue-50 rounded-xl border border-primary-200 p-6">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Zap className="w-6 h-6 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Action Next</h3>
+            
+            {weakSkills.length > 0 ? (
+              <>
+                <p className="text-gray-600 mb-3">Focus on these top weak areas:</p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {weakSkills.slice(0, 3).map((skill, idx) => (
+                    <span
+                      key={idx}
+                      className="px-3 py-1 bg-white border border-amber-300 text-amber-700 rounded-full text-sm font-medium"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+                <div className="bg-white rounded-lg p-4 border border-primary-100">
+                  <p className="text-gray-800 font-medium mb-1">Suggested next step:</p>
+                  <p className="text-gray-600">Start Day 1 of your preparation plan now. Focus on reviewing the fundamentals of your weakest skill first.</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-600 mb-3">Great job! You feel confident about all detected skills.</p>
+                <div className="bg-white rounded-lg p-4 border border-green-200">
+                  <p className="text-gray-800 font-medium mb-1">Suggested next step:</p>
+                  <p className="text-gray-600">Review the interview questions and take a mock assessment to test your knowledge.</p>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

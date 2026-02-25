@@ -78,6 +78,36 @@ export function deleteHistoryEntry(id) {
 }
 
 /**
+ * Update a history entry by ID
+ * @param {string} id - Entry ID to update
+ * @param {Object} updates - Object with fields to update
+ * @returns {Object|null} - Updated entry or null if not found
+ */
+export function updateHistoryEntry(id, updates) {
+  try {
+    const history = getHistory();
+    const entryIndex = history.findIndex(entry => entry.id === id);
+    
+    if (entryIndex === -1) {
+      return null;
+    }
+    
+    // Update the entry
+    history[entryIndex] = {
+      ...history[entryIndex],
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    return history[entryIndex];
+  } catch (error) {
+    console.error('Error updating localStorage:', error);
+    return null;
+  }
+}
+
+/**
  * Clear all history
  * @returns {boolean} - Success status
  */
